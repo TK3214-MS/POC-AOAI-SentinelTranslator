@@ -20,7 +20,7 @@
 
 1. [サンプルインシデントに関するドキュメント](https://wcddocsprdeus.file.core.windows.net/sevillestaticfiles/AttackSimulationDIYv4_FileAttack.pdf?sv=2022-11-02&se=2023-09-25T13%3A24%3A02Z&sr=f&sp=r&sig=JctGVykFl4EGxSOklvDwL%2FIYc1lSWXlR7dw9G5HzcI0%3D)を確認し、ダウンロードしておきます。
 
-**Warning**
+[!WARNING]
 
 組織の EDR ソリューションに検閲される可能性がありますので、絶対にローカル PC 上ではファイルを開かないで下さい。
 
