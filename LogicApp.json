@@ -1,0 +1,470 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "AOAI-URL": {
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "AOAI-URL",
+                            "type": "string",
+                            "value": "https://poc-sukiyanen-openai.openai.azure.com/openai/deployments/gpt-35-turbo-16k/chat/completions?api-version=2023-03-15-preview"
+                        }
+                    ]
+                },
+                "runAfter": {},
+                "type": "InitializeVariable"
+            },
+            "For_each_choices": {
+                "actions": {
+                    "For_each_lines": {
+                        "actions": {
+                            "UpdateSentinelIncident": {
+                                "inputs": {
+                                    "body": {
+                                        "description": "@items('For_each_choices')?['message']?['content']",
+                                        "incidentArmId": "@triggerBody()?['object']?['id']",
+                                        "tagsToAdd": {
+                                            "TagsToAdd": [
+                                                {
+                                                    "Tag": "@body('Parse_Description_Body')?['model']"
+                                                }
+                                            ]
+                                        },
+                                        "title": "@items('For_each_lines')?['message']?['content']"
+                                    },
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['azuresentinel_1']['connectionId']"
+                                        }
+                                    },
+                                    "method": "put",
+                                    "path": "/Incidents"
+                                },
+                                "runAfter": {},
+                                "type": "ApiConnection"
+                            }
+                        },
+                        "foreach": "@body('Parse_Title_Body')?['choices']",
+                        "runAfter": {},
+                        "type": "Foreach"
+                    }
+                },
+                "foreach": "@body('Parse_Description_Body')?['choices']",
+                "runAfter": {
+                    "Parse_Recommendations_Body": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Foreach"
+            },
+            "For_each_messages": {
+                "actions": {
+                    "For_each": {
+                        "actions": {
+                            "Post_card_in_a_chat_or_channel": {
+                                "inputs": {
+                                    "body": {
+                                        "messageBody": "{\n    \"type\": \"AdaptiveCard\",\n    \"body\": [\n        {\n            \"type\": \"TextBlock\",\n            \"size\": \"Medium\",\n            \"weight\": \"Bolder\",\n            \"text\": \"セキュリティインシデントが記録されました！\"\n        },\n        {\n            \"type\": \"TextBlock\",\n            \"text\": \"Microsoft Sentinel でセキュリティ インシデントが記録されると本メッセージが送信されます。至急内容を確認し、調査／対応を行って下さい。\",\n            \"wrap\": true\n        },\n        {\n            \"type\": \"FactSet\",\n            \"facts\": [\n                {\n                    \"title\": \"インシデントID\",\n                    \"value\": \"@{triggerBody()?['object']?['properties']?['incidentNumber']}\"\n                },\n                {\n                    \"title\": \"インシデント タイトル\",\n                    \"value\": \"@{items('For_each_messages')?['message']?['content']}\"\n                },\n                {\n                    \"title\": \"深刻度\",\n                    \"value\": \"@{triggerBody()?['object']?['properties']?['severity']}\"\n                },\n                {\n                    \"title\": \"記録日時\",\n                    \"value\": \"@{addHours(triggerBody()?['object']?['properties']?['lastModifiedTimeUtc'],9)}\"\n                },\n                {\n                    \"title\": \"推奨事項\",\n                    \"value\": \"@{items('For_each')?['message']?['content']}\"\n                }\n            ]\n        }\n    ],\n    \"actions\": [\n        {\n            \"type\": \"Action.OpenUrl\",\n            \"title\": \"インシデントの確認\",\n            \"url\": \"@{triggerBody()?['object']?['properties']?['incidentUrl']}\"\n        }\n    ],\n    \"msteams\":{\n        \"width\": \"Full\"\n    },\n    \"$schema\": \"http://adaptivecards.io/schemas/adaptive-card.json\",\n    \"version\": \"1.2\"\n}",
+                                        "recipient": {
+                                            "channelId": "19:c478c90ffe7f4dffa39f76b3ce378f5c@thread.tacv2",
+                                            "groupId": "635d33ac-f011-4c20-9870-21ecbc0a09eb"
+                                        }
+                                    },
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['teams']['connectionId']"
+                                        }
+                                    },
+                                    "method": "post",
+                                    "path": "/v1.0/teams/conversation/adaptivecard/poster/Flow bot/location/@{encodeURIComponent('Channel')}"
+                                },
+                                "runAfter": {},
+                                "type": "ApiConnection"
+                            }
+                        },
+                        "foreach": "@body('Parse_Recommendations_Body')?['choices']",
+                        "runAfter": {},
+                        "type": "Foreach"
+                    }
+                },
+                "foreach": "@body('Parse_Title_Body')?['choices']",
+                "runAfter": {
+                    "For_each_choices": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Foreach"
+            },
+            "Parse_Description_Body": {
+                "inputs": {
+                    "content": "@body('Request_Description_Translation')",
+                    "schema": {
+                        "properties": {
+                            "choices": {
+                                "items": {
+                                    "properties": {
+                                        "finish_reason": {
+                                            "type": "string"
+                                        },
+                                        "index": {
+                                            "type": "integer"
+                                        },
+                                        "message": {
+                                            "properties": {
+                                                "content": {
+                                                    "type": "string"
+                                                },
+                                                "role": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "required": [
+                                        "index",
+                                        "finish_reason",
+                                        "message"
+                                    ],
+                                    "type": "object"
+                                },
+                                "type": "array"
+                            },
+                            "created": {
+                                "type": "integer"
+                            },
+                            "id": {
+                                "type": "string"
+                            },
+                            "model": {
+                                "type": "string"
+                            },
+                            "object": {
+                                "type": "string"
+                            },
+                            "usage": {
+                                "properties": {
+                                    "completion_tokens": {
+                                        "type": "integer"
+                                    },
+                                    "prompt_tokens": {
+                                        "type": "integer"
+                                    },
+                                    "total_tokens": {
+                                        "type": "integer"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "runAfter": {
+                    "Parse_Title_Body": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "ParseJson"
+            },
+            "Parse_Recommendations_Body": {
+                "inputs": {
+                    "content": "@body('Request_Security_Recommendations')",
+                    "schema": {
+                        "properties": {
+                            "choices": {
+                                "items": {
+                                    "properties": {
+                                        "finish_reason": {
+                                            "type": "string"
+                                        },
+                                        "index": {
+                                            "type": "integer"
+                                        },
+                                        "message": {
+                                            "properties": {
+                                                "content": {
+                                                    "type": "string"
+                                                },
+                                                "role": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "required": [
+                                        "index",
+                                        "finish_reason",
+                                        "message"
+                                    ],
+                                    "type": "object"
+                                },
+                                "type": "array"
+                            },
+                            "created": {
+                                "type": "integer"
+                            },
+                            "id": {
+                                "type": "string"
+                            },
+                            "model": {
+                                "type": "string"
+                            },
+                            "object": {
+                                "type": "string"
+                            },
+                            "usage": {
+                                "properties": {
+                                    "completion_tokens": {
+                                        "type": "integer"
+                                    },
+                                    "prompt_tokens": {
+                                        "type": "integer"
+                                    },
+                                    "total_tokens": {
+                                        "type": "integer"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "runAfter": {
+                    "Request_Security_Recommendations": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "ParseJson"
+            },
+            "Parse_Title_Body": {
+                "inputs": {
+                    "content": "@body('Request_Title_Translation')",
+                    "schema": {
+                        "properties": {
+                            "choices": {
+                                "items": {
+                                    "properties": {
+                                        "finish_reason": {
+                                            "type": "string"
+                                        },
+                                        "index": {
+                                            "type": "integer"
+                                        },
+                                        "message": {
+                                            "properties": {
+                                                "content": {
+                                                    "type": "string"
+                                                },
+                                                "role": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "required": [
+                                        "index",
+                                        "finish_reason",
+                                        "message"
+                                    ],
+                                    "type": "object"
+                                },
+                                "type": "array"
+                            },
+                            "created": {
+                                "type": "integer"
+                            },
+                            "id": {
+                                "type": "string"
+                            },
+                            "model": {
+                                "type": "string"
+                            },
+                            "object": {
+                                "type": "string"
+                            },
+                            "usage": {
+                                "properties": {
+                                    "completion_tokens": {
+                                        "type": "integer"
+                                    },
+                                    "prompt_tokens": {
+                                        "type": "integer"
+                                    },
+                                    "total_tokens": {
+                                        "type": "integer"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "runAfter": {
+                    "Request_Description_Translation": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "ParseJson"
+            },
+            "Request_Description_Translation": {
+                "inputs": {
+                    "authentication": {
+                        "audience": "https://cognitiveservices.azure.com",
+                        "type": "ManagedServiceIdentity"
+                    },
+                    "body": {
+                        "frequency_penalty": 0,
+                        "max_tokens": 3000,
+                        "messages": [
+                            {
+                                "content": "You are an AI translator",
+                                "role": "system"
+                            },
+                            {
+                                "content": "Please translate the following sentense into Japanese.'@{triggerBody()?['object']?['properties']?['description']}'",
+                                "role": "user"
+                            }
+                        ],
+                        "presence_penalty": 0,
+                        "stop": null,
+                        "temperature": 0
+                    },
+                    "headers": {
+                        "Content-Type": "application/json"
+                    },
+                    "method": "POST",
+                    "uri": "@variables('AOAI-URL')"
+                },
+                "runAfter": {
+                    "Request_Title_Translation": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Http"
+            },
+            "Request_Security_Recommendations": {
+                "inputs": {
+                    "authentication": {
+                        "audience": "https://cognitiveservices.azure.com",
+                        "type": "ManagedServiceIdentity"
+                    },
+                    "body": {
+                        "frequency_penalty": 0,
+                        "max_tokens": 3000,
+                        "messages": [
+                            {
+                                "content": "You are a Security Analyst who recommends and guids people to do the right thing under security context.",
+                                "role": "system"
+                            },
+                            {
+                                "content": "Please provide recommendations or tips for the following security incident in Japanese. You can use information on the internet to help people understand tips. '@{triggerBody()?['object']?['properties']?['description']}'",
+                                "role": "user"
+                            }
+                        ],
+                        "presence_penalty": 0,
+                        "stop": null,
+                        "temperature": 0
+                    },
+                    "headers": {
+                        "Content-Type": "application/json"
+                    },
+                    "method": "POST",
+                    "uri": "@variables('AOAI-URL')"
+                },
+                "runAfter": {
+                    "Parse_Description_Body": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Http"
+            },
+            "Request_Title_Translation": {
+                "inputs": {
+                    "authentication": {
+                        "audience": "https://cognitiveservices.azure.com",
+                        "type": "ManagedServiceIdentity"
+                    },
+                    "body": {
+                        "frequency_penalty": 0,
+                        "max_tokens": 3000,
+                        "messages": [
+                            {
+                                "content": "You are an AI translator",
+                                "role": "system"
+                            },
+                            {
+                                "content": "Please translate the following sentense into Japanese.'@{triggerBody()?['object']?['properties']?['title']}'",
+                                "role": "user"
+                            }
+                        ],
+                        "presence_penalty": 0,
+                        "stop": null,
+                        "temperature": 0
+                    },
+                    "headers": {
+                        "Content-Type": "application/json"
+                    },
+                    "method": "POST",
+                    "uri": "@variables('AOAI-URL')"
+                },
+                "runAfter": {
+                    "AOAI-URL": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Http"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "parameters": {
+            "$connections": {
+                "defaultValue": {},
+                "type": "Object"
+            }
+        },
+        "triggers": {
+            "Microsoft_Sentinel_incident": {
+                "inputs": {
+                    "body": {
+                        "callback_url": "@{listCallbackUrl()}"
+                    },
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['azuresentinel_1']['connectionId']"
+                        }
+                    },
+                    "path": "/incident-creation"
+                },
+                "type": "ApiConnectionWebhook"
+            }
+        }
+    },
+    "parameters": {
+        "$connections": {
+            "value": {
+                "azuresentinel_1": {
+                    "connectionId": "/subscriptions/f9fe38c6-f3d4-475b-bb71-89d2c23bbbf4/resourceGroups/POC-AOAI/providers/Microsoft.Web/connections/azuresentinel",
+                    "connectionName": "azuresentinel",
+                    "connectionProperties": {
+                        "authentication": {
+                            "type": "ManagedServiceIdentity"
+                        }
+                    },
+                    "id": "/subscriptions/f9fe38c6-f3d4-475b-bb71-89d2c23bbbf4/providers/Microsoft.Web/locations/japaneast/managedApis/azuresentinel"
+                },
+                "teams": {
+                    "connectionId": "/subscriptions/f9fe38c6-f3d4-475b-bb71-89d2c23bbbf4/resourceGroups/POC-AOAI/providers/Microsoft.Web/connections/teams",
+                    "connectionName": "teams",
+                    "id": "/subscriptions/f9fe38c6-f3d4-475b-bb71-89d2c23bbbf4/providers/Microsoft.Web/locations/japaneast/managedApis/teams"
+                }
+            }
+        }
+    }
+}
