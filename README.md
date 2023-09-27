@@ -16,7 +16,7 @@
 
 ## 事前準備
 ### Azure Open AI リソースの作成
-1. ![手順ページ](https://learn.microsoft.com/ja-jp/azure/ai-services/openai/how-to/create-resource?pivots=web-portal)に則り、Azure Open AI Service リソースを作成します。
+1. <a href="https://learn.microsoft.com/ja-jp/azure/ai-services/openai/how-to/create-resource?pivots=web-portal" target="_blank" rel="noopener noreferrer">手順ページ</a>に則り、Azure Open AI Service リソースを作成します。
 
 1. ![手順ページ](https://learn.microsoft.com/ja-jp/azure/ai-services/openai/how-to/create-resource?pivots=web-portal#deploy-a-model)に則り、モデルを作成します。
 
